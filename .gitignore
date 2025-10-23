@@ -1,0 +1,30 @@
+# Python cache
+__pycache__/
+*.py[cod]
+
+# Jupyter notebooks checkpoints
+.ipynb_checkpoints/
+
+# Environment and virtual env folders
+.env
+.venv
+*.env
+
+# System files
+.DS_Store
+Thumbs.db
+
+# Logs or temporary files
+*.log
+*.tmp
+
+# VS Code settings
+.vscode/
+
+# Exported models or data
+*.pkl
+*.h5
+*.csv
+
+# Ignore output folders
+outputs/
