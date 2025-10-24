@@ -1,85 +1,121 @@
-
-
-from __future__ import annotations
-from pathlib import Path
 import pandas as pd
+import numpy as np
+from pathlib import Path
+import matplotlib.pyplot as plt
+from matplotlib.colors import ListedColormap
+import seaborn as sns
+from wordcloud import WordCloud, STOPWORDS
 
-DEFAULT_TRAIN = Path("C:/Users/Bronny/PS1_EX4_NB_TO_REPO/data/train.csv")
-DEFAULT_TEST = Path("C:/Users/Bronny/PS1_EX4_NB_TO_REPO/data/test.csv")
+from sklearn.model_selection import train_test_split
+from sklearn import metrics
+from sklearn.metrics import roc_auc_score
+from sklearn.ensemble import RandomForestClassifier
 
 
-def load_data(
-    train_path: str | Path = DEFAULT_TRAIN,
-    test_path: str | Path = DEFAULT_TEST
-) -> tuple[pd.DataFrame, pd.DataFrame]:
-
+def load_data(train_path, test_path):
     train_df = pd.read_csv(train_path)
     test_df = pd.read_csv(test_path)
     return train_df, test_df
 
 
-def missing_summary(df: pd.DataFrame) -> pd.DataFrame:
-
+def analyze_missing_data(df):
+    """
+    Analyze missing data in a DataFrame
+    
+    Parameters:
+    -----------
+    df : pandas.DataFrame
+        DataFrame to analyze
+        
+    Returns:
+    --------
+    pandas.DataFrame
+        Transposed DataFrame containing missing data statistics including:
+        - Total: Total number of missing values
+        - Percent: Percentage of missing values
+        - Types: Data types
+    """
     total = df.isnull().sum()
-    percent = (df.isnull().sum() / df.shape[0] * 100)
+    percent = (df.isnull().sum() / df.isnull().count() * 100)
     tt = pd.concat([total, percent], axis=1, keys=['Total', 'Percent'])
-    types = [str(df[col].dtype) for col in df.columns]
+    
+    types = []
+    for col in df.columns:
+        dtype = str(df[col].dtype)
+        types.append(dtype)
     tt['Types'] = types
-    uniques = [df[col].nunique(dropna=True) for col in df.columns]
-    tt['Uniques'] = uniques
-    return tt.T
+    
+    return np.transpose(tt)
 
-def most_frequent_summary(df: pd.DataFrame) -> pd.DataFrame:
-    import numpy as np
-    import pandas as pd
 
+def analyze_frequent_data(df):
+    """
+    Analyze the most frequent values and frequencies for each column in a DataFrame
+    
+    Parameters:
+    -----------
+    df : pandas.DataFrame
+        DataFrame to analyze
+        
+    Returns:
+    --------
+    pandas.DataFrame
+        Transposed DataFrame containing most frequent data statistics including:
+        - Total: Total number of non-null values
+        - Most frequent item: Most frequent value
+        - Frequence: Count of most frequent value
+        - Percent from total: Percentage of most frequent value from total
+    """
     total = df.count()
-    tt = pd.DataFrame(total, columns=['Total'])
+    tt = pd.DataFrame(total)
+    tt.columns = ['Total']
+    
     items = []
     vals = []
     for col in df.columns:
         try:
-            vc = df[col].value_counts()
-            itm = vc.index[0]
-            val = vc.values[0]
+            itm = df[col].value_counts().index[0]
+            val = df[col].value_counts().values[0]
             items.append(itm)
             vals.append(val)
-        except Exception:
-            items.append(None)
+        except Exception as ex:
+            print(f"Error processing column {col}: {ex}")
+            items.append(0)
             vals.append(0)
             continue
+    
     tt['Most frequent item'] = items
     tt['Frequence'] = vals
     tt['Percent from total'] = np.round(vals / total * 100, 3)
-    return tt.T
+    
+    return np.transpose(tt)
 
 
-def nonnull_unique_summary(df: pd.DataFrame) -> pd.DataFrame:
+def analyze_unique_values(df):
+    """
+    Analyze the number of unique values for each column in a DataFrame
+    
+    Parameters:
+    -----------
+    df : pandas.DataFrame
+        DataFrame to analyze
+        
+    Returns:
+    --------
+    pandas.DataFrame
+        Transposed DataFrame containing unique values statistics including:
+        - Total: Total number of non-null values
+        - Uniques: Number of unique values
+    """
     total = df.count()
-    tt = pd.DataFrame(total, columns=['Total'])
-    uniques = [df[col].nunique(dropna=True) for col in df.columns]
+    tt = pd.DataFrame(total)
+    tt.columns = ['Total']
+    
+    uniques = []
+    for col in df.columns:
+        unique = df[col].nunique()
+        uniques.append(unique)
     tt['Uniques'] = uniques
-    return tt.T
+    
+    return np.transpose(tt)
 
-
-def concat_with_set(train_df: pd.DataFrame, test_df: pd.DataFrame) -> pd.DataFrame:
-
-    all_df = pd.concat([train_df, test_df], axis=0, ignore_index=True)
-    all_df['set'] = 'train'
-    if 'Survived' in all_df.columns:
-        all_df.loc[all_df['Survived'].isna(), 'set'] = 'test'
-    return all_df
-
-
-def inspect_dataframes(train_df: pd.DataFrame, test_df: pd.DataFrame, head_n: int = 5) -> None:
-    print("\n===== TRAIN SET =====")
-    display(train_df.head(head_n))
-    print("\nShape:", train_df.shape)
-    print("\nInfo:")
-    display(train_df.info())
-
-    print("\n===== TEST SET =====")
-    display(test_df.head(head_n))
-    print("\nShape:", test_df.shape)
-    print("\nInfo:")
-    display(test_df.info())

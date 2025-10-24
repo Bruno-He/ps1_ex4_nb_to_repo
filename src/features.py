@@ -1,123 +1,217 @@
-
-from __future__ import annotations
 import pandas as pd
 import numpy as np
 
 
-def add_family_size(df: pd.DataFrame) -> pd.DataFrame:
-    """Return a copy of df with 'Family Size' = SibSp + Parch + 1."""
-    out = df.copy()
-    out["Family Size"] = out["SibSp"].fillna(0) + out["Parch"].fillna(0) + 1
-    return out
+def create_family_size(df):
+    """
+    Create family size feature
+    
+    Parameters:
+    -----------
+    df : pandas.DataFrame
+        DataFrame containing SibSp and Parch columns
+        
+    Returns:
+    --------
+    pandas.DataFrame
+        DataFrame with added Family Size column
+    """
+    df = df.copy()
+    df["Family Size"] = df["SibSp"] + df["Parch"] + 1
+    return df
 
 
-def bin_continuous(col: pd.Series, bins, labels=None) -> pd.Series:
-    """Generic binning helper based on pandas.cut."""
-    return pd.cut(col, bins=bins, labels=labels, include_lowest=True, right=True)
+def create_age_intervals(df):
+    """
+    Create age interval feature
+    
+    Parameters:
+    -----------
+    df : pandas.DataFrame
+        DataFrame containing Age column
+        
+    Returns:
+    --------
+    pandas.DataFrame
+        DataFrame with added Age Interval column
+    """
+    df = df.copy()
+    df["Age Interval"] = 0.0
+    df.loc[df['Age'] <= 16, 'Age Interval'] = 0
+    df.loc[(df['Age'] > 16) & (df['Age'] <= 32), 'Age Interval'] = 1
+    df.loc[(df['Age'] > 32) & (df['Age'] <= 48), 'Age Interval'] = 2
+    df.loc[(df['Age'] > 48) & (df['Age'] <= 64), 'Age Interval'] = 3
+    df.loc[df['Age'] > 64, 'Age Interval'] = 4
+    return df
 
 
-def add_age_interval(
-    df: pd.DataFrame,
-    bins=(-np.inf, 16, 32, 48, 64, np.inf),
-    labels=(0, 1, 2, 3, 4),
-) -> pd.DataFrame:
-    """Add 'Age Interval' categorical/bin column using fixed cut points."""
-    out = df.copy()
-    out['Age Interval'] = pd.cut(
-        out['Age'], bins=bins, labels=labels, include_lowest=True, right=True
-    )
-    out['Age Interval'] = out['Age Interval'].astype(float)
-    return out
+def create_fare_intervals(df):
+    """
+    Create fare interval feature
+    
+    Parameters:
+    -----------
+    df : pandas.DataFrame
+        DataFrame containing Fare column
+        
+    Returns:
+    --------
+    pandas.DataFrame
+        DataFrame with added Fare Interval column
+    """
+    df = df.copy()
+    df['Fare Interval'] = 0.0
+    df.loc[df['Fare'] <= 7.91, 'Fare Interval'] = 0
+    df.loc[(df['Fare'] > 7.91) & (df['Fare'] <= 14.454), 'Fare Interval'] = 1
+    df.loc[(df['Fare'] > 14.454) & (df['Fare'] <= 31), 'Fare Interval'] = 2
+    df.loc[df['Fare'] > 31, 'Fare Interval'] = 3
+    return df
 
 
-def add_fare_interval(
-    df: pd.DataFrame,
-    cuts=(-np.inf, 7.91, 14.454, 31, np.inf),
-    labels=(0, 1, 2, 3),
-) -> pd.DataFrame:
-    """Add 'Fare Interval' categorical/bin column."""
-    out = df.copy()
-    out['Fare Interval'] = pd.cut(
-        out['Fare'], bins=cuts, labels=labels, include_lowest=True, right=True
-    )
-    out['Fare Interval'] = out['Fare Interval'].astype(float)
-    return out
+def create_sex_pclass_feature(df):
+    """
+    Create sex and passenger class combination feature
+    
+    Parameters:
+    -----------
+    df : pandas.DataFrame
+        DataFrame containing Sex and Pclass columns
+        
+    Returns:
+    --------
+    pandas.DataFrame
+        DataFrame with added Sex_Pclass column
+    """
+    df = df.copy()
+    df["Sex_Pclass"] = df.apply(lambda row: row['Sex'][0].upper() + "_C" + str(row["Pclass"]), axis=1)
+    return df
 
 
-def add_sex_pclass(df: pd.DataFrame) -> pd.DataFrame:
-    """Add combined 'Sex_Pclass' feature."""
-    out = df.copy()
-    out['Sex_Pclass'] = out.apply(
-        lambda r: (str(r.get('Sex', ''))[:1] or '?').upper() + "_C" + str(int(r['Pclass'])),
-        axis=1,
-    )
-    return out
+def create_family_type(df):
+    """
+    Create family type feature
+    
+    Parameters:
+    -----------
+    df : pandas.DataFrame
+        DataFrame containing Family Size column
+        
+    Returns:
+    --------
+    pandas.DataFrame
+        DataFrame with added Family Type column
+    """
+    df = df.copy()
+    df["Family Type"] = df["Family Size"]
+    df.loc[df["Family Size"] == 1, "Family Type"] = "Single"
+    df.loc[(df["Family Size"] > 1) & (df["Family Size"] < 5), "Family Type"] = "Small"
+    df.loc[(df["Family Size"] >= 5), "Family Type"] = "Large"
+    return df
 
 
-def parse_names_row(row) -> pd.Series:
-    """Parse a Titanic passenger 'Name' field into components."""
+def standardize_titles(df):
+    """
+    Standardize title features
+    
+    Parameters:
+    -----------
+    df : pandas.DataFrame
+        DataFrame containing Title column
+        
+    Returns:
+    --------
+    pandas.DataFrame
+        DataFrame with added Titles column, titles standardized
+    """
+    df = df.copy()
+    df["Titles"] = df["Title"]
+    
+    # 统一Miss相关头衔
+    df['Titles'] = df['Titles'].replace('Mlle.', 'Miss.')
+    df['Titles'] = df['Titles'].replace('Ms.', 'Miss.')
+    
+    # 统一Mrs相关头衔
+    df['Titles'] = df['Titles'].replace('Mme.', 'Mrs.')
+    
+    # 统一稀有头衔
+    rare_titles = ['Lady.', 'the Countess.', 'Capt.', 'Col.', 'Don.', 'Dr.', 
+                   'Major.', 'Rev.', 'Sir.', 'Jonkheer.', 'Dona.']
+    df['Titles'] = df['Titles'].replace(rare_titles, 'Rare')
+    
+    return df
+
+
+def parse_names(row):
+    """
+    Parse name string to extract family name, title, given name and maiden name
+    
+    Parameters:
+    -----------
+    row : pandas.Series
+        Row data containing Name column
+        
+    Returns:
+    --------
+    pandas.Series
+        Series containing [Family Name, Title, Given Name, Maiden Name]
+    """
     try:
         text = row["Name"]
         split_text = text.split(",")
         family_name = split_text[0]
         next_text = split_text[1]
         split_text = next_text.split(".")
-        title = (split_text[0] + ".").strip()
+        title = (split_text[0] + ".").lstrip().rstrip()
         next_text = split_text[1]
         if "(" in next_text:
             split_text = next_text.split("(")
-            given_name = split_text[0].strip()
-            maiden_name = split_text[1].rstrip(")").strip()
+            given_name = split_text[0]
+            maiden_name = split_text[1].rstrip(")")
             return pd.Series([family_name, title, given_name, maiden_name])
         else:
-            given_name = next_text.strip()
+            given_name = next_text
             return pd.Series([family_name, title, given_name, None])
-    except Exception:
+    except Exception as ex:
+        print(f"Exception parsing name '{row['Name']}': {ex}")
         return pd.Series([None, None, None, None])
 
 
-def add_parsed_name_columns(df: pd.DataFrame) -> pd.DataFrame:
-    """Add parsed name components to dataframe."""
-    out = df.copy()
-    out[["Family Name", "Title", "Given Name", "Maiden Name"]] = out.apply(
-        parse_names_row, axis=1
-    )
-    return out
+def extract_name_features(df):
+    """
+    Extract features from names
+    
+    Parameters:
+    -----------
+    df : pandas.DataFrame
+        DataFrame containing Name column
+        
+    Returns:
+    --------
+    pandas.DataFrame
+        DataFrame with added Family Name, Title, Given Name, Maiden Name columns
+    """
+    df = df.copy()
+    df[["Family Name", "Title", "Given Name", "Maiden Name"]] = df.apply(lambda row: parse_names(row), axis=1)
+    return df
 
 
-def copy_titles(df: pd.DataFrame) -> pd.DataFrame:
-    """Duplicate the Title column as Titles."""
-    out = df.copy()
-    out["Titles"] = out["Title"]
-    return out
-
-
-def add_family_type(df: pd.DataFrame) -> pd.DataFrame:
-    """Map Family Size into Family Type categorical values."""
-    out = df.copy()
-    out['Family Type'] = out['Family Size']
-    out.loc[out['Family Size'] == 1, 'Family Type'] = 'Single'
-    out.loc[(out['Family Size'] > 1) & (out['Family Size'] < 5), 'Family Type'] = 'Small'
-    out.loc[out['Family Size'] >= 5, 'Family Type'] = 'Large'
-    return out
-
-
-def unify_titles(df: pd.DataFrame) -> pd.DataFrame:
-    """Normalize rare titles."""
-    out = df.copy()
-    if 'Titles' not in out.columns:
-        return out
-    out['Titles'] = out['Titles'].replace({'Mlle.': 'Miss.', 'Ms.': 'Miss.', 'Mme.': 'Mrs.'})
-    rare = [
-        'Lady.', 'the Countess.', 'Capt.', 'Col.', 'Don.', 'Dr.',
-        'Major.', 'Rev.', 'Sir.', 'Jonkheer.', 'Dona.'
-    ]
-    out['Titles'] = out['Titles'].replace(rare, 'Rare')
-    return out
-
-
-def encode_sex_numeric(df: pd.DataFrame) -> pd.DataFrame:
-    """Encode Sex as numeric 0/1."""
-    out = df.copy()
-    out['Sex'] = out['Sex'].map({'female': 1, 'male': 0}).astype('Int64')
-    return out
+def combine_datasets(train_df, test_df):
+    """
+    Combine training and test datasets with dataset identifier
+    
+    Parameters:
+    -----------
+    train_df : pandas.DataFrame
+        Training DataFrame
+    test_df : pandas.DataFrame
+        Test DataFrame
+        
+    Returns:
+    --------
+    pandas.DataFrame
+        Combined DataFrame with set column identifying data source
+    """
+    all_df = pd.concat([train_df, test_df], axis=0)
+    all_df["set"] = "train"
+    all_df.loc[all_df.Survived.isna(), "set"] = "test"
+    return all_df

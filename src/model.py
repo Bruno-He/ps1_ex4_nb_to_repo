@@ -1,80 +1,144 @@
-
-from __future__ import annotations
-from dataclasses import dataclass
-from typing import Sequence
-import numpy as np
 import pandas as pd
+import numpy as np
 from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestClassifier
 from sklearn import metrics
 
 
-@dataclass
-class Split:
-    train: pd.DataFrame
-    valid: pd.DataFrame
+def encode_categorical_features(df):
+    """
+    Encode categorical features to numerical values
+    
+    Parameters:
+    -----------
+    df : pandas.DataFrame
+        DataFrame containing categorical features
+        
+    Returns:
+    --------
+    pandas.DataFrame
+        Encoded DataFrame
+    """
+    df = df.copy()
+    # 性别编码
+    df['Sex'] = df['Sex'].map({'female': 1, 'male': 0}).astype(int)
+    return df
 
 
-def make_split(
-    df: pd.DataFrame,
-    valid_size: float = 0.2,
-    random_state: int = 42,
-    shuffle: bool = True
-) -> Split:
-    """Create a train/validation split from the labelled training dataframe."""
-    train, valid = train_test_split(
-        df, test_size=valid_size, random_state=random_state, shuffle=shuffle
-    )
-    return Split(train=train, valid=valid)
-
-
-def get_xy(
-    train: pd.DataFrame,
-    valid: pd.DataFrame,
-    predictors: Sequence[str],
-    target: str
-):
-    """Return X_train, y_train, X_valid, y_valid according to predictors/target."""
+def prepare_training_data(train_df, predictors, target, test_size=0.2, random_state=42):
+    """
+    Prepare training data including feature and label separation and train-validation split
+    
+    Parameters:
+    -----------
+    train_df : pandas.DataFrame
+        Training DataFrame
+    predictors : list
+        List of predictor feature column names
+    target : str
+        Target variable column name
+    test_size : float
+        Validation set proportion
+    random_state : int
+        Random seed
+        
+    Returns:
+    --------
+    tuple
+        (train_X, train_Y, valid_X, valid_Y) Training and validation features and labels
+    """
+    train, valid = train_test_split(train_df, test_size=test_size, random_state=random_state, shuffle=True)
+    
     train_X = train[predictors]
     train_Y = train[target].values
     valid_X = valid[predictors]
     valid_Y = valid[target].values
+    
     return train_X, train_Y, valid_X, valid_Y
 
 
-def fit_predict_rf(
-    train_df: pd.DataFrame,
-    valid_df: pd.DataFrame,
-    predictors: Sequence[str],
-    target: str,
-    n_estimators: int = 100,
-    random_state: int = 42,
-    n_jobs: int = -1,
-    criterion: str = "gini",
-    verbose: bool = False
-):
+def train_random_forest(train_X, train_Y, n_estimators=100, random_state=42, criterion="gini", n_jobs=-1):
     """
-    Fit a RandomForestClassifier and return fitted model and validation predictions.
-
-    Returns
-    -------
-    model : RandomForestClassifier
-    preds : np.ndarray
-    metrics_dict : dict with 'classification_report' (as dict) and 'auc' (float)
+    Train a Random Forest classifier
+    
+    Parameters:
+    -----------
+    train_X : pandas.DataFrame or numpy.ndarray
+        Training features
+    train_Y : numpy.ndarray
+        Training labels
+    n_estimators : int
+        Number of decision trees
+    random_state : int
+        Random seed
+    criterion : str
+        Splitting criterion
+    n_jobs : int
+        Number of parallel jobs
+        
+    Returns:
+    --------
+    sklearn.ensemble.RandomForestClassifier
+        Trained Random Forest classifier
     """
-    Xtr, ytr, Xva, yva = get_xy(train_df, valid_df, predictors, target)
     clf = RandomForestClassifier(
         n_jobs=n_jobs,
         random_state=random_state,
         criterion=criterion,
         n_estimators=n_estimators,
-        verbose=verbose
+        verbose=False
     )
-    clf.fit(Xtr, ytr)
-    preds = clf.predict(Xva)
-    proba = clf.predict_proba(Xva)[:, 1] if hasattr(clf, "predict_proba") else None
-    report = metrics.classification_report(
-        yva, preds, target_names=['Not Survived', 'Survived'], output_dict=True
-    )
-    auc = metrics.roc_auc_score(yva, proba) if proba is not None else None
-    return clf, preds, {'classification_report': report, 'auc': auc}
+    clf.fit(train_X, train_Y)
+    return clf
+
+
+def evaluate_model(model, X, y, target_names=None):
+    """
+    Evaluate model performance
+    
+    Parameters:
+    -----------
+    model : sklearn classifier
+        Trained classifier
+    X : pandas.DataFrame or numpy.ndarray
+        Feature data
+    y : numpy.ndarray
+        True labels
+    target_names : list, optional
+        Target class names
+        
+    Returns:
+    --------
+    dict
+        Dictionary containing predictions and classification report
+    """
+    predictions = model.predict(X)
+    
+    if target_names is None:
+        target_names = ['Not Survived', 'Survived']
+    
+    classification_report = metrics.classification_report(y, predictions, target_names=target_names)
+    
+    return {
+        'predictions': predictions,
+        'classification_report': classification_report
+    }
+
+
+def get_model_predictions(model, X):
+    """
+    Get model predictions
+    
+    Parameters:
+    -----------
+    model : sklearn classifier
+        Trained classifier
+    X : pandas.DataFrame or numpy.ndarray
+        Feature data
+        
+    Returns:
+    --------
+    numpy.ndarray
+        Predictions
+    """
+    return model.predict(X)
